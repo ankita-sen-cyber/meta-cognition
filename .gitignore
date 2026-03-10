@@ -1,0 +1,15 @@
+# data artifacts
+/data/raw/
+/data/processed/
+/data
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+
+# macOS
+.DS_Store

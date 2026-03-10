@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import argparse
+import csv
 import json
+import os
 import random
 from typing import Dict, List, Optional
 
@@ -128,24 +130,55 @@ def main() -> int:
     total = 0
     idf, knowledge_vecs = build_tfidf(knowledge)
 
-    for seq in eval_seqs:
-        q_vec = vectorize_sequence(seq, idf)
-        match_id, _, _ = best_match(
-            seq, q_vec, knowledge, knowledge_vecs, jaccard_threshold
+    matches_path = "data/processed/matches_paper_digital_twin.csv"
+    os.makedirs("data/processed", exist_ok=True)
+    with open(matches_path, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "seq_id",
+                "root_cause",
+                "match_root_cause",
+                "distance",
+                "jaccard",
+            ],
         )
-        if match_id is not None:
-            total += 1
-            if str(seq.root_cause) == str(knowledge[match_id].root_cause):
-                correct += 1
+        writer.writeheader()
 
-        if args.dynamic_update:
-            knowledge.append(seq)
-            idf, knowledge_vecs = build_tfidf(knowledge)
+        seq_id = 0
+        for seq in eval_seqs:
+            q_vec = vectorize_sequence(seq, idf)
+            match_id, dist, jac = best_match(
+                seq, q_vec, knowledge, knowledge_vecs, jaccard_threshold
+            )
+            match_root = (
+                knowledge[match_id].root_cause if match_id is not None else None
+            )
+            writer.writerow(
+                {
+                    "seq_id": seq_id,
+                    "root_cause": seq.root_cause,
+                    "match_root_cause": match_root,
+                    "distance": dist,
+                    "jaccard": jac,
+                }
+            )
+            seq_id += 1
+
+            if match_id is not None:
+                total += 1
+                if str(seq.root_cause) == str(match_root):
+                    correct += 1
+
+            if args.dynamic_update:
+                knowledge.append(seq)
+                idf, knowledge_vecs = build_tfidf(knowledge)
 
     acc = (correct / total) if total else 0.0
     print(f"Sampled sequences: {len(sampled)}")
     print(f"Knowledge base size: {len(knowledge)}")
     print(f"Evaluated sequences: {len(eval_seqs)}")
+    print(f"Wrote: {matches_path}")
     print(f"Accuracy: {acc:.4f} ({correct}/{total})")
     return 0
 
